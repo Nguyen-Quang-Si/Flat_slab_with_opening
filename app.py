@@ -155,7 +155,7 @@ st.markdown("""
 st.markdown("""
 <div class="app-header">
     <p class="app-subtitle">Advanced Machine Learning Predictor</p>
-    <h1 class="app-title">Punching Shear Strength Web</h1>
+    <h1 class="app-title">Punching Shear Strength Of Flat Slab With Opening</h1>
 </div>
 """, unsafe_allow_html=True)
 
