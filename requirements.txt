@@ -1,8 +1,8 @@
-streamlit==1.32.0
-pandas==2.2.1
-numpy==1.26.4
-catboost==1.2.3
-scikit-learn==1.4.1
-openpyxl==3.1.2
-matplotlib==3.8.3
-seaborn==0.13.2
+streamlit
+pandas
+numpy
+catboost
+scikit-learn
+openpyxl
+matplotlib
+seaborn
