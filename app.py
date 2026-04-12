@@ -164,20 +164,25 @@ col_input, col_result = st.columns([1.1, 0.9], gap="large")
 
 with col_input:
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Thông số Hình học & Vật liệu</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Geometry & Materials</div>', unsafe_allow_html=True)
     
     g1, g2 = st.columns(2)
     with g1:
-        d = st.number_input("📏 d - Eff. depth (mm)", value=150.0, step=1.0)
-        c = st.number_input("⬛ c - Col. width (mm)", value=300.0, step=1.0)
-        fc = st.number_input("🧪 f'c - Comp. Str (MPa)", value=30.0, step=0.1)
-        rho = st.number_input("⛓️ ρ - Reinf. ratio (%)", value=1.0, step=0.01)
+        h_slab = st.number_input("📏 h - Slab thickness (mm)", value=200.0, step=1.0)
+        c_cov = st.number_input("🛡️ c_cov - Concrete cover (mm)", value=30.0, step=1.0)
+        L_span = st.number_input("↔️ L - Span length (mm)", value=2000.0, step=10.0)
+        c = st.number_input("⬛ c - Column width (mm)", value=300.0, step=1.0)
 
     with g2:
-        ad = st.number_input("📐 a/d - Span ratio", value=3.0, step=0.1)
-        Dop = st.number_input("🔲 Dop - Open size (mm)", value=0.0, step=1.0)
-        Sop = st.number_input("↔️ Sop - Open dist (mm)", value=1000.0, step=1.0)
-        shape = st.selectbox("💠 Shape of Opening", ["Square", "Circular", "Rectangular"])
+        fc = st.number_input("🧪 f'c - Concrete strength (MPa)", value=30.0, step=0.1)
+        rho = st.number_input("⛓️ ρ - Reinf. ratio (%)", value=1.0, step=0.01)
+        Dop = st.number_input("🔲 Dop - Opening size (mm)", value=0.0, step=1.0)
+        Sop = st.number_input("📍 Sop - Opening distance (mm)", value=1000.0, step=1.0)
+
+    # Internal Calculations
+    d_eff = h_slab - c_cov
+    a_span = L_span / 2
+    ad_ratio = a_span / d_eff if d_eff > 0 else 0
 
     st.markdown("<br>", unsafe_allow_html=True)
     calculate = st.button("Calculate Prediction (Vu)")
@@ -185,7 +190,7 @@ with col_input:
 
 with col_result:
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Kết quả Dự báo Sức kháng</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Prediction Results</div>', unsafe_allow_html=True)
     
     if calculate:
         try:
@@ -193,8 +198,8 @@ with col_result:
             model = CatBoostRegressor()
             model.load_model('best_catboost_model.cbm')
             
-            # Prediction
-            input_df = pd.DataFrame([[d, c, fc, rho, ad, Dop, Sop]], 
+            # Prepare Input (7 features model)
+            input_df = pd.DataFrame([[d_eff, c, fc, rho, ad_ratio, Dop, Sop]], 
                                     columns=['d_mm', 'C_mm', 'fc_prime_MPa', 'rho_percent', 'a_over_d', 'Opening_Size_mm', 'Opening_Dist_mm'])
             prediction = model.predict(input_df)[0]
             
@@ -207,20 +212,17 @@ with col_result:
                 </div>
             """, unsafe_allow_html=True)
             
-            # Detailed Variable List
+            # Detailed Variable List (Derived values)
             st.markdown(f"""
                 <div class="feature-list-box">
-                    <p style="font-weight: 800; color: #0f172a; margin-bottom: 15px;">• Chi tiết biến không thứ nguyên</p>
-                    <div class="feature-item"><span>X1 (f'c)</span> <span>{fc:.4f}</span></div>
-                    <div class="feature-item"><span>X2 (d)</span> <span>{d:.4f}</span></div>
-                    <div class="feature-item"><span>X3 (c)</span> <span>{c:.4f}</span></div>
-                    <div class="feature-item"><span>X4 (ρ)</span> <span>{rho:.4f}</span></div>
-                    <div class="feature-item"><span>X5 (a/d)</span> <span>{ad:.4f}</span></div>
-                    <div class="feature-item"><span>X6 (Dop)</span> <span>{Dop:.4f}</span></div>
-                    <div class="feature-item"><span>X7 (Sop)</span> <span>{Sop:.4f}</span></div>
-                    <div class="feature-item" style="color:#008df9;"><span>X8 (Shape)</span> <span>{shape}</span></div>
+                    <p style="font-weight: 800; color: #0f172a; margin-bottom: 15px;">• Detailed Calculated Values</p>
+                    <div class="feature-item"><span>d (h - c_cov)</span> <span>{d_eff:.2f} mm</span></div>
+                    <div class="feature-item"><span>a/d ((L/2)/d)</span> <span>{ad_ratio:.3f}</span></div>
                 </div>
             """, unsafe_allow_html=True)
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.info("💡 This result is calculated based on the optimized CatBoost model with R² = 0.988.")
             
         except Exception as e:
             st.error(f"Error loading model or predicting: {e}")
@@ -232,7 +234,7 @@ with col_result:
                 <p class="unit-text">kN</p>
             </div>
             <p style="text-align: center; color: #94a3b8; font-size: 14px; margin-top: 20px;">
-                Vui lòng nhập thông số bên trái và bấm nút "Calculate"
+                Please input parameters on the left and click 'Calculate Prediction'
             </p>
         """, unsafe_allow_html=True)
         
@@ -242,8 +244,7 @@ with col_result:
 st.markdown("""
     <div style="text-align: center; margin-top: 4rem; padding-bottom: 2rem;">
         <p style="color: #94a3b8; font-size: 12px; font-weight: 500;">
-            © 2026 • AI-POWERED PUNCHING SHEAR PREDICTOR • RESEARCH BY UTC TEAM
+            © 2026 • AI-POWERED PUNCHING SHEAR PREDICTOR • RESEARCH BY OWNER & UTC TEAM
         </p>
     </div>
 """, unsafe_allow_html=True)
-
