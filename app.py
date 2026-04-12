@@ -6,7 +6,7 @@ import os
 
 # ─── CONFIGURATION ───
 st.set_page_config(
-    page_title="Punching Shear Prediction Web",
+    page_title="Punching Shear Prediction Of Flat Slab With Opening",
     page_icon="💎",
     layout="wide",
     initial_sidebar_state="collapsed"
