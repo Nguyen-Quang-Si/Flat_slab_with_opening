@@ -242,7 +242,7 @@ with col_result:
 st.markdown("""
     <div style="text-align: center; margin-top: 4rem; padding-bottom: 2rem;">
         <p style="color: #94a3b8; font-size: 12px; font-weight: 500;">
-            © 2026 • AI-POWERED PUNCHING SHEAR PREDICTOR • RESEARCH BY OWNER & ANTIGRAVITY
+            © 2026 • AI-POWERED PUNCHING SHEAR PREDICTOR • RESEARCH BY UTC TEAM
         </p>
     </div>
 """, unsafe_allow_html=True)
