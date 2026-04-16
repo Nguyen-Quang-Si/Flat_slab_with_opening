@@ -230,11 +230,6 @@ with col_result:
                         <div class="feature-item"><span>d = h − c_cov</span> <span>{d_eff:.1f} mm</span></div>
                         <div class="feature-item"><span>a = L / 2</span>     <span>{a_span:.1f} mm</span></div>
                         <div class="feature-item"><span>a/d</span>           <span>{ad_ratio:.3f}</span></div>
-                        <div class="feature-item"><span>c (column)</span>    <span>{c:.1f} mm</span></div>
-                        <div class="feature-item"><span>f'c</span>           <span>{fc:.1f} MPa</span></div>
-                        <div class="feature-item"><span>ρ</span>             <span>{rho:.3f} %</span></div>
-                        <div class="feature-item"><span>D_op</span>          <span>{Dop:.1f} mm</span></div>
-                        <div class="feature-item"><span>S_op</span>          <span>{Sop:.1f} mm</span></div>
                     </div>
                 """, unsafe_allow_html=True)
                 
