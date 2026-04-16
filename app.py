@@ -6,7 +6,7 @@ import os
 
 # ─── CONFIGURATION ───
 st.set_page_config(
-    page_title="Punching Shear Prediction Of Flat Slab With Opening",
+    page_title="Punching Shear Prediction Tool",
     page_icon="💎",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -23,13 +23,11 @@ st.markdown("""
         color: #1e293b;
     }
     
-    /* Center the app container */
     .block-container {
         padding-top: 2rem;
         max-width: 1200px;
     }
     
-    /* Header Styling */
     .app-header {
         text-align: center;
         margin-bottom: 3rem;
@@ -51,7 +49,6 @@ st.markdown("""
         text-transform: uppercase;
     }
 
-    /* Professional Cards */
     .glass-card {
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(10px);
@@ -76,14 +73,12 @@ st.markdown("""
         padding-left: 15px;
     }
 
-    /* Input Styling */
     .stNumberInput label {
         font-size: 14px !important;
         font-weight: 600 !important;
         color: #475569 !important;
     }
     
-    /* Button Premium */
     .stButton > button {
         background: linear-gradient(135deg, #004c6d, #008df9);
         color: white;
@@ -104,7 +99,6 @@ st.markdown("""
         color: white;
     }
     
-    /* Results Styling */
     .result-display {
         background: #f8fafc;
         border-radius: 20px;
@@ -127,7 +121,6 @@ st.markdown("""
         font-weight: 600;
     }
 
-    /* Feature Detail List */
     .feature-list-box {
         background: #ffffff;
         border: 1.5px dashed #008df9;
@@ -151,11 +144,20 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+
+# ─── LOAD MODEL (cached — only once per session) ───
+@st.cache_resource
+def load_model():
+    model = CatBoostRegressor()
+    model.load_model('best_catboost_model.cbm')
+    return model
+
+
 # ─── HEADER ───
 st.markdown("""
 <div class="app-header">
     <p class="app-subtitle">Advanced Machine Learning Predictor</p>
-    <h1 class="app-title">Punching Shear Strength Of Flat Slab With Opening</h1>
+    <h1 class="app-title">Punching Shear Strength Prediction Tool</h1>
 </div>
 """, unsafe_allow_html=True)
 
@@ -168,24 +170,33 @@ with col_input:
     
     g1, g2 = st.columns(2)
     with g1:
-        h_slab = st.number_input("📏 h - Slab thickness (mm)", value=200.0, step=1.0)
-        c_cov = st.number_input("🛡️ c_cov - Concrete cover (mm)", value=30.0, step=1.0)
-        L_span = st.number_input("↔️ L - Span length (mm)", value=2000.0, step=10.0)
-        c = st.number_input("⬛ c - Column width (mm)", value=300.0, step=1.0)
+        h_slab  = st.number_input("📏 h — Slab thickness (mm)",   min_value=50.0,  value=200.0, step=1.0)
+        c_cov   = st.number_input("🛡️ c_cov — Concrete cover (mm)", min_value=0.0,   value=30.0,  step=1.0)
+        L_span  = st.number_input("↔️ L — Span length (mm)",       min_value=100.0, value=2000.0, step=10.0)
+        c       = st.number_input("⬛ c — Column width (mm)",       min_value=50.0,  value=300.0, step=1.0)
 
     with g2:
-        fc = st.number_input("🧪 f'c - Concrete strength (MPa)", value=30.0, step=0.1)
-        rho = st.number_input("⛓️ ρ - Reinf. ratio (%)", value=1.0, step=0.01)
-        Dop = st.number_input("🔲 Dop - Opening size (mm)", value=0.0, step=1.0)
-        Sop = st.number_input("📍 Sop - Opening distance (mm)", value=1000.0, step=1.0)
+        fc      = st.number_input("🧪 f'c — Concrete strength (MPa)", min_value=10.0, value=30.0, step=0.1)
+        rho     = st.number_input("⛓️ ρ — Reinf. ratio (%)",          min_value=0.01, value=1.0,  step=0.01)
+        Dop     = st.number_input("🔲 Dop — Opening size (mm)",        min_value=0.0,  value=0.0,  step=1.0)
+        Sop     = st.number_input("📍 Sop — Opening distance (mm)",    min_value=0.0,  value=1000.0, step=1.0)
 
-    # Internal Calculations
-    d_eff = h_slab - c_cov
-    a_span = L_span / 2
-    ad_ratio = a_span / d_eff if d_eff > 0 else 0
+    # ── Derived values ──
+    d_eff    = h_slab - c_cov          # d = h - cover (assumes bar centroid ≈ cover face)
+    a_span   = L_span / 2              # shear span = L/2 for interior column
+    ad_ratio = a_span / d_eff if d_eff > 0 else 0.0
+
+    # ── Input validation warnings ──
+    if d_eff <= 0:
+        st.error("⚠️ Effective depth d = h - c_cov must be > 0. Please check inputs.")
+    if fc < 10:
+        st.warning("⚠️ f'c < 10 MPa is unusually low. Please verify.")
+    if rho < 0.01 or rho > 5.0:
+        st.warning("⚠️ Reinforcement ratio ρ should typically be between 0.1% – 5%.")
 
     st.markdown("<br>", unsafe_allow_html=True)
-    calculate = st.button("Calculate Prediction (Vu)")
+    calculate = st.button("⚡ Calculate Prediction (Vu)")
+    st.caption("Note: d = h − c_cov (concrete cover to bar face). For more precise d, subtract half bar diameter manually.")
     st.markdown('</div>', unsafe_allow_html=True)
 
 with col_result:
@@ -193,39 +204,45 @@ with col_result:
     st.markdown('<div class="section-title">Prediction Results</div>', unsafe_allow_html=True)
     
     if calculate:
-        try:
-            # Load Model
-            model = CatBoostRegressor()
-            model.load_model('best_catboost_model.cbm')
-            
-            # Prepare Input (7 features model)
-            input_df = pd.DataFrame([[d_eff, c, fc, rho, ad_ratio, Dop, Sop]], 
-                                    columns=['d_mm', 'C_mm', 'fc_prime_MPa', 'rho_percent', 'a_over_d', 'Opening_Size_mm', 'Opening_Dist_mm'])
-            prediction = model.predict(input_df)[0]
-            
-            # Display Result
-            st.markdown(f"""
-                <div class="result-display">
-                    <p style="color: #008df9; font-weight: 700; margin-bottom: 10px;">PREDICTED PUNCHING STRENGTH</p>
-                    <h1 class="vu-text">{prediction:.2f}</h1>
-                    <p class="unit-text">kN</p>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            # Detailed Variable List (Derived values)
-            st.markdown(f"""
-                <div class="feature-list-box">
-                    <p style="font-weight: 800; color: #0f172a; margin-bottom: 15px;">• Detailed Calculated Values</p>
-                    <div class="feature-item"><span>d (h - c_cov)</span> <span>{d_eff:.2f} mm</span></div>
-                    <div class="feature-item"><span>a/d ((L/2)/d)</span> <span>{ad_ratio:.3f}</span></div>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.info("💡 This result is calculated based on the optimized CatBoost model with R² = 0.988.")
-            
-        except Exception as e:
-            st.error(f"Error loading model or predicting: {e}")
+        if d_eff <= 0:
+            st.error("Cannot predict: effective depth d ≤ 0.")
+        else:
+            try:
+                model = load_model()
+                
+                input_df = pd.DataFrame([[d_eff, c, fc, rho, ad_ratio, Dop, Sop]],
+                                        columns=['d_mm', 'C_mm', 'fc_prime_MPa', 'rho_percent',
+                                                 'a_over_d', 'Opening_Size_mm', 'Opening_Dist_mm'])
+                prediction = model.predict(input_df)[0]
+                prediction = max(0.0, prediction)   # clamp to non-negative
+                
+                st.markdown(f"""
+                    <div class="result-display">
+                        <p style="color: #008df9; font-weight: 700; margin-bottom: 10px;">PREDICTED PUNCHING STRENGTH</p>
+                        <h1 class="vu-text">{prediction:.2f}</h1>
+                        <p class="unit-text">kN</p>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                st.markdown(f"""
+                    <div class="feature-list-box">
+                        <p style="font-weight: 800; color: #0f172a; margin-bottom: 15px;">• Derived Input Values</p>
+                        <div class="feature-item"><span>d = h − c_cov</span> <span>{d_eff:.1f} mm</span></div>
+                        <div class="feature-item"><span>a = L / 2</span>     <span>{a_span:.1f} mm</span></div>
+                        <div class="feature-item"><span>a/d</span>           <span>{ad_ratio:.3f}</span></div>
+                        <div class="feature-item"><span>c (column)</span>    <span>{c:.1f} mm</span></div>
+                        <div class="feature-item"><span>f'c</span>           <span>{fc:.1f} MPa</span></div>
+                        <div class="feature-item"><span>ρ</span>             <span>{rho:.3f} %</span></div>
+                        <div class="feature-item"><span>D_op</span>          <span>{Dop:.1f} mm</span></div>
+                        <div class="feature-item"><span>S_op</span>          <span>{Sop:.1f} mm</span></div>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.info("💡 Optimised CatBoost model · R² = 0.988 · MAE ≈ 15 kN on 754-sample dataset.")
+                
+            except Exception as e:
+                st.error(f"Error: {e}")
     else:
         st.markdown("""
             <div class="result-display" style="opacity: 0.5;">
@@ -234,7 +251,7 @@ with col_result:
                 <p class="unit-text">kN</p>
             </div>
             <p style="text-align: center; color: #94a3b8; font-size: 14px; margin-top: 20px;">
-                Please input parameters on the left and click 'Calculate Prediction'
+                Enter parameters on the left and click 'Calculate Prediction'
             </p>
         """, unsafe_allow_html=True)
         
@@ -244,7 +261,7 @@ with col_result:
 st.markdown("""
     <div style="text-align: center; margin-top: 4rem; padding-bottom: 2rem;">
         <p style="color: #94a3b8; font-size: 12px; font-weight: 500;">
-            © 2026 • AI-POWERED PUNCHING SHEAR PREDICTOR • RESEARCH BY UTC TEAM
+            © 2026 · AI-Powered Punching Shear Prediction Tool · Ho Chi Minh City University of Technology and Education (HCMUTE)
         </p>
     </div>
 """, unsafe_allow_html=True)
