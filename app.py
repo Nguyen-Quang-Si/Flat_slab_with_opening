@@ -234,7 +234,7 @@ with col_result:
                 """, unsafe_allow_html=True)
                 
                 st.markdown("<br>", unsafe_allow_html=True)
-                st.info("💡 Optimised CatBoost model · R² = 0.988 · MAE ≈ 15 kN on 754-sample dataset.")
+                st.info("💡 Optimised CatBoost model · R² = 0.952 · MAE ≈ 44.9 kN on 754-sample dataset.")
                 
             except Exception as e:
                 st.error(f"Error: {e}")
@@ -256,7 +256,7 @@ with col_result:
 st.markdown("""
     <div style="text-align: center; margin-top: 4rem; padding-bottom: 2rem;">
         <p style="color: #94a3b8; font-size: 12px; font-weight: 500;">
-            © 2026 · AI-Powered Punching Shear Prediction Tool · Ho Chi Minh City University of Technology and Education (HCMUTE)
+            © 2026 · AI-Powered Punching Shear Prediction Tool · University of Trainsport and Communication (UTC Team)
         </p>
     </div>
 """, unsafe_allow_html=True)
