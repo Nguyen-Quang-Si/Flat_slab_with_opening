@@ -1,183 +1,330 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
+from pathlib import Path
 import joblib
+import numpy as np
+import pandas as pd
+import streamlit as st
 
-# ─── CONFIGURATION ───
 st.set_page_config(
-    page_title="Punching Shear Prediction Tool",
-    page_icon="💎",
+    page_title="OpenPunch-RF",
+    page_icon="◼",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded",
 )
 
-# ─── PREMIUM CUSTOM CSS ───
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_FILES = [
+    BASE_DIR / "best_rf_model.joblib",
+    BASE_DIR / "best_random_forest_model.joblib",
+]
+
+RANGES = {
+    "d": (30.0, 500.0),
+    "c": (40.06, 1000.0),
+    "sqrt_fc": (2.943, 10.895),
+    "rho": (0.22, 3.73),
+    "ad": (0.62, 13.55),
+    "Dop": (0.0, 700.0),
+    "Sop": (0.0, 450.0),
+}
+
 st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
-    html, body, [class*="css"] {
-        font-family: 'Outfit', sans-serif;
-        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-        color: #1e293b;
-    }
-    .block-container { padding-top: 2rem; max-width: 1200px; }
-    .app-header { text-align: center; margin-bottom: 3rem; }
-    .app-title {
-        font-size: 42px; font-weight: 800;
-        background: linear-gradient(90deg, #0f172a, #004c6d);
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        margin-bottom: 10px;
-    }
-    .app-subtitle { font-size: 16px; color: #64748b; letter-spacing: 1px; text-transform: uppercase; }
-    .glass-card {
-        background: rgba(255,255,255,0.95); backdrop-filter: blur(10px);
-        border: 1px solid rgba(255,255,255,0.2); padding: 40px;
-        border-radius: 32px; box-shadow: 0 20px 50px rgba(0,0,0,0.05);
-        height: 100%; transition: transform 0.3s ease;
-    }
-    .glass-card:hover { transform: translateY(-5px); }
-    .section-title {
-        font-size: 20px; font-weight: 700; color: #0f172a;
-        margin-bottom: 25px; border-left: 5px solid #008df9; padding-left: 15px;
-    }
-    .stNumberInput label { font-size: 14px !important; font-weight: 600 !important; color: #475569 !important; }
-    .stButton > button {
-        background: linear-gradient(135deg, #004c6d, #008df9);
-        color: white; font-weight: 700; font-size: 18px;
-        padding: 0.8rem 2rem; border-radius: 16px; border: none;
-        width: 100%; margin-top: 20px;
-        box-shadow: 0 10px 20px rgba(0,76,109,0.2);
-        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-    .stButton > button:hover { transform: scale(1.02); box-shadow: 0 15px 30px rgba(0,76,109,0.3); color: white; }
-    .result-display {
-        background: #f8fafc; border-radius: 20px; padding: 30px;
-        text-align: center; border: 1px solid #e2e8f0;
-    }
-    .vu-text { font-size: 72px; font-weight: 800; color: #0f172a; margin: 0; line-height:1; }
-    .unit-text { font-size: 24px; color: #64748b; font-weight: 600; }
-    .feature-list-box {
-        background: #ffffff; border: 1.5px dashed #008df9;
-        border-radius: 20px; padding: 25px; margin-top: 30px;
-    }
-    .feature-item {
-        display: flex; justify-content: space-between; padding: 8px 0;
-        border-bottom: 1px solid #f1f5f9;
-        font-family: 'Courier New', monospace; font-size: 14px;
-    }
-    .feature-item:last-child { border-bottom: none; }
-    </style>
+<style>
+:root{
+  --bg:#0b0f15; --side:#111827; --line:#273142; --text:#f4f7fb;
+  --muted:#8e9bab; --blue:#78c8f4; --yellow:#4d4a11; --yellowb:#6d681d;
+  --red:#4c1f25; --redb:#78343c; --green:#123623; --greenb:#255d3d;
+}
+html,body,[data-testid="stAppViewContainer"]{background:var(--bg);color:var(--text);}
+[data-testid="stHeader"]{background:rgba(11,15,21,.92);}
+[data-testid="stSidebar"]{background:var(--side);border-right:1px solid #222c38;}
+.block-container{padding-top:1.6rem;max-width:1450px;}
+#MainMenu, footer{visibility:hidden;}
+
+.kicker{font-size:.72rem;color:#9ba8b8;font-weight:800;text-transform:uppercase;letter-spacing:.1em}
+.title{font-size:2.35rem;font-weight:850;color:#fff;line-height:1.05;margin:.25rem 0 .35rem}
+.subtitle{font-size:.92rem;color:#aab4c2;line-height:1.55;max-width:1050px}
+.notice{background:var(--yellow);border:1px solid var(--yellowb);color:#eee9a8;
+padding:.72rem .9rem;border-radius:4px;font-size:.8rem;line-height:1.4;margin-top:1rem}
+.sec{font-size:1.02rem;font-weight:850;color:#fff;margin:1.2rem 0 .55rem}
+.metric-caption{font-size:.68rem;color:#99a5b5;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
+.metric-value{font-size:2rem;font-weight:850;color:#fff;line-height:1.05}
+.metric-unit{font-size:.84rem;color:#8895a5;margin-left:.2rem}
+.mini{height:54px;border-top:1px solid #202936;border-bottom:1px solid #202936;
+display:flex;align-items:flex-end;padding:.32rem 0;margin-top:.35rem}
+.bar{width:100%;background:var(--blue)}
+.good{background:var(--green);border:1px solid var(--greenb);color:#baf0cc;
+padding:.72rem .9rem;border-radius:4px;font-size:.82rem;line-height:1.45}
+.bad{background:var(--red);border:1px solid var(--redb);color:#ffb9bf;
+padding:.72rem .9rem;border-radius:4px;font-size:.82rem;line-height:1.45}
+.sidehead{font-size:.95rem;font-weight:850;color:#fff;margin:.1rem 0 .65rem}
+.sidesub{font-size:.68rem;font-weight:850;color:#aab4c2;text-transform:uppercase;
+letter-spacing:.06em;margin:.8rem 0 .3rem}
+.derived{background:#0d1420;border:1px solid #273142;border-radius:4px;padding:.7rem .75rem;
+font-size:.77rem;line-height:1.6;color:#c3cbd6}
+[data-testid="stNumberInput"] input,
+[data-testid="stSelectbox"] div[data-baseweb="select"]>div{
+background:#192231!important;color:#fff!important;border-color:#2e3948!important}
+[data-testid="stNumberInput"] button{
+background:#151e2a!important;color:#dce4ee!important;border-color:#2e3948!important}
+.stButton>button{width:100%;border-radius:4px;border:1px solid #2c8dbd;
+background:#1177aa;color:#fff;font-weight:850;min-height:2.7rem}
+.stButton>button:hover{background:#168bc5;border-color:#45b9ef;color:#fff}
+[data-testid="stDataFrame"]{border:1px solid #273142;border-radius:4px;overflow:hidden}
+[data-testid="stExpander"]{background:#0f1623;border:1px solid #273142;border-radius:4px}
+</style>
 """, unsafe_allow_html=True)
 
-
-# ─── LOAD MODEL (cached) ───
 @st.cache_resource
 def load_model():
-    model = joblib.load('best_rf_model.joblib')
-    return model
+    for p in MODEL_FILES:
+        if p.exists():
+            return joblib.load(p), p.name
+    raise FileNotFoundError(
+        "Random Forest model not found. Put best_rf_model.joblib "
+        "or best_random_forest_model.joblib beside app.py."
+    )
 
+def norm(s):
+    return (str(s).strip().lower().replace("'", "").replace("√","sqrt")
+            .replace("/","_over_").replace("-","_").replace(" ","_")
+            .replace("(","").replace(")",""))
 
-# ─── HEADER ───
+def make_X(model, d, c, sqrt_fc, rho, ad, Dop, Sop):
+    vals = {
+        "d":d, "c":c, "sqrt_fc":sqrt_fc, "rho":rho,
+        "a_over_d":ad, "dop":Dop, "sop":Sop
+    }
+    aliases = {
+        "d":"d","d_mm":"d","effective_depth":"d","effective_depth_mm":"d",
+        "c":"c","c_mm":"c","column_width":"c","column_dimension":"c",
+        "sqrt_fc":"sqrt_fc","sqrt_f_c":"sqrt_fc","sqrt_fc_prime":"sqrt_fc",
+        "sqrt_f_c_prime":"sqrt_fc","sqrt_concrete_strength":"sqrt_fc",
+        "rho":"rho","rho_percent":"rho","reinforcement_ratio":"rho",
+        "flexural_reinforcement_ratio":"rho",
+        "a_over_d":"a_over_d","a_d":"a_over_d","shear_span_to_depth_ratio":"a_over_d",
+        "dop":"dop","dop_mm":"dop","opening_size":"dop","opening_size_mm":"dop",
+        "sop":"sop","sop_mm":"sop","opening_distance":"sop",
+        "opening_distance_mm":"sop","opening_distance_to_column_face":"sop",
+    }
+    if hasattr(model, "feature_names_in_"):
+        cols = list(model.feature_names_in_)
+        row = {}
+        for col in cols:
+            n = norm(col)
+            key = aliases.get(n)
+            if key is None and n.startswith("sqrt") and ("fc" in n or "concrete" in n):
+                key = "sqrt_fc"
+            if key is None and ("opening" in n and ("size" in n or "dop" in n)):
+                key = "dop"
+            if key is None and ("opening" in n and ("distance" in n or "sop" in n or "dist" in n)):
+                key = "sop"
+            if key is None and ("rho" in n or "reinforcement_ratio" in n):
+                key = "rho"
+            if key is None and ("a_over_d" in n or "shear_span" in n):
+                key = "a_over_d"
+            if key is None:
+                raise ValueError(f"Unrecognized feature name in saved model: {col}")
+            row[col] = vals[key]
+        return pd.DataFrame([row], columns=cols)
+    return np.array([[d,c,sqrt_fc,rho,ad,Dop,Sop]], dtype=float)
+
+def in_range(v, lo, hi):
+    return lo <= v <= hi
+
+def metric_card(caption, value, unit="", ratio=.5):
+    h = max(4, min(46, 46*float(ratio)))
+    st.markdown(f"""
+    <div>
+      <div class="metric-caption">{caption}</div>
+      <span class="metric-value">{value}</span><span class="metric-unit">{unit}</span>
+      <div class="mini"><div class="bar" style="height:{h:.1f}px"></div></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ---------------- SIDEBAR ----------------
+with st.sidebar:
+    st.markdown('<div class="sidehead">Input case</div>', unsafe_allow_html=True)
+
+    a1, a2 = st.columns(2)
+    with a1:
+        h = st.number_input("h — slab thickness (mm)", min_value=1.0, value=200.0, step=1.0)
+        cover = st.number_input("cover (mm)", min_value=0.0, value=30.0, step=1.0)
+        a = st.number_input("a — shear span (mm)", min_value=1.0, value=1000.0, step=10.0)
+        c = st.number_input("c — column width (mm)", min_value=1.0, value=300.0, step=1.0)
+
+    with a2:
+        fc = st.number_input("f'c (MPa)", min_value=0.1, value=30.0, step=0.1)
+        rho = st.number_input("ρ (%)", min_value=0.01, value=1.00, step=0.01)
+        Dop_ui = st.number_input("Dop (mm)", min_value=0.0, value=0.0, step=1.0)
+        Sop_ui = st.number_input("Sop (mm)", min_value=0.0, value=0.0, step=1.0)
+
+    st.markdown('<div class="sidesub">Opening configuration</div>', unsafe_allow_html=True)
+    case = st.selectbox("Case", ["Solid slab / no opening", "Slab with opening"])
+
+    d = h - cover
+    sqrt_fc = np.sqrt(fc)
+    ad = a/d if d > 0 else np.nan
+
+    if case == "Solid slab / no opening":
+        Dop, Sop = 0.0, 0.0
+    else:
+        Dop, Sop = Dop_ui, Sop_ui
+
+    st.markdown('<div class="sidesub">Derived model variables</div>', unsafe_allow_html=True)
+    if d > 0:
+        st.markdown(f"""
+        <div class="derived">
+          <b>d</b> = {d:.1f} mm<br>
+          <b>a/d</b> = {ad:.3f}<br>
+          <b>√f'c</b> = {sqrt_fc:.3f}<br>
+          <b>Dop used</b> = {Dop:.1f} mm<br>
+          <b>Sop used</b> = {Sop:.1f} mm
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.error("d = h − cover must be greater than zero.")
+
+    run = st.button("Run RF diagnostic")
+
+# ---------------- HEADER ----------------
+st.markdown('<div class="kicker">Random Forest diagnostic predictor</div>', unsafe_allow_html=True)
+st.markdown('<div class="title">OpenPunch-RF</div>', unsafe_allow_html=True)
 st.markdown("""
-<div class="app-header">
-    <p class="app-subtitle">Advanced Machine Learning Predictor</p>
-    <h1 class="app-title">Punching Shear Strength Prediction Tool</h1>
+<div class="subtitle">
+A diagnostic benchmark tool for punching shear prediction of RC flat slabs with openings.
+The interface keeps practical inputs <b>h</b>, <b>cover</b>, and shear span <b>a</b>, while
+internally deriving the seven predictors used by the optimized Random Forest model.
 </div>
 """, unsafe_allow_html=True)
 
-# ─── MAIN LAYOUT ───
-col_input, col_result = st.columns([1.1, 0.9], gap="large")
-
-with col_input:
-    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Geometry & Materials</div>', unsafe_allow_html=True)
-
-    g1, g2 = st.columns(2)
-    with g1:
-        h_slab = st.number_input("h — Slab thickness (mm)",       min_value=50.0,   value=200.0,  step=1.0)
-        c_cov  = st.number_input("c_cov — Concrete cover (mm)",   min_value=0.0,    value=30.0,   step=1.0)
-        L_span = st.number_input("L — Span length (mm)",          min_value=100.0,  value=2000.0, step=10.0)
-        c      = st.number_input("c — Column width (mm)",         min_value=50.0,   value=300.0,  step=1.0)
-    with g2:
-        fc     = st.number_input("f'c — Concrete strength (MPa)", min_value=10.0,   value=30.0,   step=0.1)
-        rho    = st.number_input("rho — Reinf. ratio (%)",        min_value=0.01,   value=1.0,    step=0.01)
-        Dop    = st.number_input("Dop — Opening size (mm)",       min_value=0.0,    value=0.0,    step=1.0)
-        Sop    = st.number_input("Sop — Opening distance (mm)",   min_value=0.0,    value=1000.0, step=1.0)
-
-    # Derived values
-    d_eff    = h_slab - c_cov
-    a_span   = L_span / 2
-    ad_ratio = a_span / d_eff if d_eff > 0 else 0.0
-
-    # Validation warnings
-    if d_eff <= 0:
-        st.error("Effective depth d = h - c_cov must be > 0.")
-    if fc < 10:
-        st.warning("f'c < 10 MPa is unusually low. Please verify.")
-    if rho < 0.01 or rho > 5.0:
-        st.warning("Reinforcement ratio rho should be between 0.1% and 5%.")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    calculate = st.button("Calculate Prediction (Vu)")
-    st.caption("Note: d = h - c_cov (to bar face). For higher precision, subtract half bar diameter.")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-with col_result:
-    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Prediction Results</div>', unsafe_allow_html=True)
-
-    if calculate:
-        if d_eff <= 0:
-            st.error("Cannot predict: effective depth d <= 0.")
-        else:
-            try:
-                model = load_model()
-                input_df = pd.DataFrame([[d_eff, c, fc, rho, ad_ratio, Dop, Sop]],
-                                        columns=['d_mm', 'C_mm', 'fc_prime_MPa', 'rho_percent',
-                                                 'a_over_d', 'Opening_Size_mm', 'Opening_Dist_mm'])
-                prediction = max(0.0, model.predict(input_df)[0])
-
-                st.markdown(f"""
-                    <div class="result-display">
-                        <p style="color:#008df9;font-weight:700;margin-bottom:10px;">PREDICTED PUNCHING STRENGTH</p>
-                        <h1 class="vu-text">{prediction:.2f}</h1>
-                        <p class="unit-text">kN</p>
-                    </div>
-                """, unsafe_allow_html=True)
-
-                st.markdown(f"""
-                    <div class="feature-list-box">
-                        <p style="font-weight:800;color:#0f172a;margin-bottom:15px;">Derived Input Values</p>
-                        <div class="feature-item"><span>d = h - c_cov</span><span>{d_eff:.1f} mm</span></div>
-                        <div class="feature-item"><span>a = L / 2</span><span>{a_span:.1f} mm</span></div>
-                        <div class="feature-item"><span>a/d</span><span>{ad_ratio:.3f}</span></div>
-                    </div>
-                """, unsafe_allow_html=True)
-
-                st.markdown("<br>", unsafe_allow_html=True)
-                st.info("Random Forest (Optimized) — Test R2=0.972 — Trained on 754-sample dataset.")
-
-            except Exception as e:
-                st.error(f"Error: {e}")
-    else:
-        st.markdown("""
-            <div class="result-display" style="opacity:0.5;">
-                <p style="font-weight:700;margin-bottom:10px;">STATUS: WAITING</p>
-                <h1 class="vu-text">---.--</h1>
-                <p class="unit-text">kN</p>
-            </div>
-            <p style="text-align:center;color:#94a3b8;font-size:14px;margin-top:20px;">
-                Enter parameters on the left and click Calculate Prediction
-            </p>
-        """, unsafe_allow_html=True)
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# ─── FOOTER ───
 st.markdown("""
-    <div style="text-align:center;margin-top:4rem;padding-bottom:2rem;">
-        <p style="color:#94a3b8;font-size:12px;font-weight:500;">
-            2026 - AI-Powered Punching Shear Prediction Tool - HCMUTE
-        </p>
-    </div>
+<div class="notice">
+<b>Research diagnostic.</b> Predictions are data-driven and should be interpreted within
+the experimental domain used to train the model. The application is intended for research
+and preliminary assessment, not as a replacement for code-based design verification.
+</div>
 """, unsafe_allow_html=True)
+
+if "pred" not in st.session_state:
+    st.session_state.pred = None
+    st.session_state.model_name = None
+    st.session_state.err = None
+
+if run:
+    if d <= 0:
+        st.session_state.err = "Effective depth d must be greater than zero."
+        st.session_state.pred = None
+    else:
+        try:
+            model, name = load_model()
+            X = make_X(model, d, c, sqrt_fc, rho, ad, Dop, Sop)
+            st.session_state.pred = max(float(model.predict(X)[0]), 0.0)
+            st.session_state.model_name = name
+            st.session_state.err = None
+        except Exception as e:
+            st.session_state.err = str(e)
+            st.session_state.pred = None
+
+if st.session_state.err:
+    st.error(st.session_state.err)
+
+# ---------------- HEADLINE ----------------
+st.markdown('<div class="sec">Headline diagnostic — single case</div>', unsafe_allow_html=True)
+c1,c2,c3 = st.columns(3, gap="large")
+
+with c1:
+    if st.session_state.pred is None:
+        metric_card("Optimized Random Forest", "—", "kN", .35)
+    else:
+        metric_card("Optimized Random Forest", f"{st.session_state.pred:.1f}", "kN",
+                    min(st.session_state.pred/700,1))
+
+with c2:
+    metric_card("Derived effective depth, d", f"{d:.1f}" if d>0 else "—", "mm",
+                min(max(d,0)/500,1))
+
+with c3:
+    metric_card("Derived shear-span ratio, a/d", f"{ad:.3f}" if d>0 else "—", "",
+                min(max(ad if d>0 else 0,0)/13.55,1))
+
+# ---------------- DIAGNOSTIC TABLE ----------------
+st.markdown('<div class="sec">Applicability bracket — model-input diagnostics</div>', unsafe_allow_html=True)
+
+table = pd.DataFrame([
+    ["Effective depth","d",d,"mm",*RANGES["d"]],
+    ["Column width","c",c,"mm",*RANGES["c"]],
+    ["Concrete-strength transform","√f'c",sqrt_fc,"√MPa",*RANGES["sqrt_fc"]],
+    ["Reinforcement ratio","ρ",rho,"%",*RANGES["rho"]],
+    ["Shear-span ratio","a/d",ad,"-",*RANGES["ad"]],
+    ["Opening size","Dop",Dop,"mm",*RANGES["Dop"]],
+    ["Opening distance","Sop",Sop,"mm",*RANGES["Sop"]],
+], columns=["Variable","Symbol","Current value","Unit","Training min","Training max"])
+
+table["Status"] = [
+    "Within range" if in_range(v,lo,hi) else "Outside range"
+    for v,lo,hi in zip(table["Current value"],table["Training min"],table["Training max"])
+]
+
+st.dataframe(
+    table,
+    use_container_width=True,
+    hide_index=True,
+    column_config={
+        "Current value": st.column_config.NumberColumn(format="%.3f"),
+        "Training min": st.column_config.NumberColumn(format="%.3f"),
+        "Training max": st.column_config.NumberColumn(format="%.3f"),
+    },
+)
+
+# ---------------- INTERPRETATION ----------------
+st.markdown('<div class="sec">Geometry-region interpretation</div>', unsafe_allow_html=True)
+outside = table[table["Status"]=="Outside range"]
+
+if outside.empty:
+    st.markdown("""
+    <div class="good">
+    <b>Within the reported experimental domain.</b>
+    All seven model predictors for the current case fall within the ranges reported in the study database.
+    This does not guarantee specimen-level accuracy, but the case is not an obvious range extrapolation.
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    syms = ", ".join(outside["Symbol"].astype(str))
+    st.markdown(f"""
+    <div class="bad">
+    <b>Applicability warning.</b>
+    The following predictor(s) fall outside the reported training ranges: <b>{syms}</b>.
+    The Random Forest prediction should therefore be interpreted with additional caution.
+    </div>
+    """, unsafe_allow_html=True)
+
+with st.expander("▸ Random Forest model information"):
+    st.write(
+        "The app loads `best_rf_model.joblib` or `best_random_forest_model.joblib` "
+        "from the same repository folder as app.py."
+    )
+    if st.session_state.model_name:
+        st.write(f"Loaded model: `{st.session_state.model_name}`")
+    st.write(
+        "Reported independent-test performance used in the manuscript: "
+        "R² = 0.9720, RMSE = 33.07 kN, MAE = 22.84 kN, MAPE = 11.86%."
+    )
+
+with st.expander("▸ Predictor transformation used by the app"):
+    st.markdown(r"""
+- \(d = h - cover\)
+- \(a/d = a / d\)
+- \(\sqrt{f'_c}\) is calculated internally from the entered concrete strength.
+- For a solid slab, the model receives \(D_{op}=0\) and \(S_{op}=0\).
+
+The final RF input vector is:
+\(d,\;c,\;\sqrt{f'_c},\;\rho,\;a/d,\;D_{op},\;S_{op}\).
+""")
+
+with st.expander("▸ Important modelling note"):
+    st.write(
+        "If 'cover' means clear concrete cover, d = h − cover is an approximation. "
+        "For strict section geometry, effective depth should account for the reinforcement-bar centroid."
+    )
+
+st.caption("OpenPunch-RF · Research prototype · University of Transport and Communications")
